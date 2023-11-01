@@ -1,0 +1,14 @@
+---
+- name: Windows | Package Manager
+  hosts: all
+  tasks:
+    - name: Install/Update Package
+      win_chocolatey:
+        name: "{{ package_name }}"
+        state: "{{ package_version }}"
+      when: package_version != ""
+    - name: Install Package (Latest)
+      win_chocolatey:
+        name: "{{ package_name }}"
+        state: "present"
+      when: package_version == ""

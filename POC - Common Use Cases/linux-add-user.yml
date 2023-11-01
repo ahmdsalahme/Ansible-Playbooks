@@ -1,0 +1,8 @@
+---
+- name: Add User
+  hosts: all
+  tasks:
+    - name: Add User
+      user:
+        name: "{{ user_name }}"
+        password: "{{ user_pass | password_hash('sha512') }}"

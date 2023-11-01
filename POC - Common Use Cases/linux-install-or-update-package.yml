@@ -1,0 +1,14 @@
+---
+- name: Install/Update Package
+  hosts: all
+  tasks:
+    - name: Install/Update Package (Latest)
+      yum:
+        name:  "{{ package_name }}"
+        state: "latest"
+      when: package_version == ""
+    - name: Install/Update Package
+      yum:
+        name:  "{{ package_name }}"
+        state: "{{ package_version }}"
+      when: package_version != ""

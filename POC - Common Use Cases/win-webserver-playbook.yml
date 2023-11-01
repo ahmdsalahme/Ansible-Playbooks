@@ -1,0 +1,12 @@
+---
+- name: WINDOWS | Install & Start WebServer using Apache
+  hosts: all
+  tasks:
+    - name: Install Apache
+      win_chocolatey:
+        name: apache-httpd
+        state: present
+    - name: Copy Custom Page to Default Home Page
+      win_copy:
+        src: ./src/web-server/
+        dest: '%AppData%\Apache24\htdocs\'

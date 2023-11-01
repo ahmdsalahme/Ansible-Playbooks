@@ -1,0 +1,122 @@
+---
+- name: Check {{ service_name }} Service Status | Playbook
+  hosts: all
+  tasks:
+  - name: Gathering All Services
+    service_facts:
+  - name: Check {{ service_name }} Service State
+    set_fact:
+      service_status: "{{ ansible_facts['services'][service_name + '.service']['state'] if ansible_facts['services'][service_name + '.service'] is defined else 'Not Installed'}}"
+  - block:
+    - name: Start {{ service_name }} Service (If not Running)
+      service:
+        name: "{{ service_name }}"
+        state: started
+    - name: Register Starting the Service
+      set_fact:
+        service_error:
+          stdout: "Started the service"
+    - name: Clear Temp Cache
+      file:
+        path: "/tmp/ans-{{ service_name }}.tmp"
+        state: absent
+    always:
+      - name: Check Logging Cache
+        stat:
+          path: "/tmp/ans-{{ service_name }}.tmp"
+        register: tmpfile
+      - block:
+        - name: Enable Reporting
+          set_fact:
+            report_enabled: true
+          delegate_to: localhost
+          delegate_facts: true
+        - name: Saving Logging Cache
+          copy:
+            content: "{{ service_error.stdout }}"
+            dest: "/tmp/ans-{{ service_name }}.tmp"
+          when: service_error.stdout is defined and service_error.stdout != "Started the service"
+        when: tmpfile.stat.exists == false  or (ansible_date_time.epoch|float - tmpfile.stat.mtime) > 0.5*3600
+    when: service_status != "running"
+    rescue:
+      - name: Gathering Error Message
+        shell: "journalctl -u {{ service_name }} | tail -n 6"
+        register: service_error
+  - name: Save Service Report
+    set_fact:
+      service_report: |
+        <tr>
+          <td> {{ ansible_facts['nodename'] }} </td>
+          <td> {{ ansible_default_ipv4.address|default(ansible_all_ipv4_addresses[0]) }} </td>
+          <td> {{ service_name }} </td>
+          <td class="{{ "text-green" if service_status == "running" else "text-red" }}"> {{ service_status }} </td>
+          {{ "<td class='text-green'> running </td>" if service_error is not defined or service_error.stdout ==  "Started the service"  else "<td class='text-red'> stopped </td>"  }}
+          <td style="text-align: left; color: #e59c01"> {{ "" if service_error is not defined else service_error.stdout }} </td>
+        </tr>
+  
+  
+# ------------------------------------------------------------------------------------------
+#   Master PlayBook
+# ------------------------------------------------------------------------------------------
+
+- name: Master | Playbook
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    results_list: []
+  tasks:
+  - block:
+      - name: Gathering All Hosts Results
+        set_fact:
+          results_list: "{{  results_list + [ hostvars[item]['service_report'] ]  }}"
+        with_items: "{{ hostvars['localhost']['groups']['all'] }}"
+        when: hostvars[item]['service_report'] is defined
+      - name: Preparing The Report
+        set_fact:
+          services_report: |
+            <head>
+            <style>
+                body {width: 100%}
+                .table100 {max-width: 100%}
+                *,a,h1,h2,h3,h4,h5,h6,li,p,ul{margin:0}input,textarea{display:block;outline:0}a:focus,button{outline:0!important}iframe,input{border:none!important}.limiter,table{width:100%;margin:0 auto}table,table *{position:relative}.table100-head th,tbody tr{font-size:15px;line-height:1.2}tbody tr:hover,tbody tr:nth-child(2n){background-color:#f5f5f5}*{padding:0;box-sizing:border-box;font-family:-apple-system,system-ui,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue','Fira Sans',Ubuntu,Oxygen,'Oxygen Sans',Cantarell,'Droid Sans','Apple Color Emoji','Segoe UI Emoji','Segoe UI Emoji','Segoe UI Symbol','Lucida Grande',Helvetica,Arial,sans-serif;font-weight:400}body,html{height:100%;font-family:sans-serif;}a{transition:.4s;-webkit-transition:.4s;-o-transition:.4s;-moz-transition:.4s}a:hover{text-decoration:none}li,ul{list-style-type:none}input:focus,textarea:focus{border-color:transparent!important}button{border:none;background:0 0}.container-table100{width:100%;min-height:100vh;background:#c850c0;background:-webkit-linear-gradient(45deg,#4158d0,#c850c0);background:-o-linear-gradient(45deg,#4158d0,#c850c0);background:-moz-linear-gradient(45deg,#4158d0,#c850c0);background:linear-gradient(45deg,#4158d0,#c850c0);display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;padding:33px 30px}.wrap-table100{width:1170px}table{border-spacing:1px;border-collapse:collapse;background:#fff;border-radius:5px 5px 2px 2px;overflow:hidden;border:1px solid #CCC}table td,table th{padding-left:8px;text-align:center}table thead tr{height:50px;background:#36304a}table tbody tr{height:50px}table tbody tr:last-child{border:0}table td.l,table th.l{text-align:right}table td.c,table td.r,table th.c,table th.r{text-align:center}.table100-head th{color:#fff;font-weight:700}tbody tr{color:gray;font-weight:unset}tbody tr:hover{color:#555}.column1{width:160px;padding-left:40px}.column2,.column3,.column4{width:120px}.column6{padding-right:62px}@media screen and (max-width:992px){table,table td,table th,table tr,table>*{display:block}table thead{display:none}table tbody tr{height:auto;padding:37px 0}table tbody tr td{padding-left:40%!important;margin-bottom:24px}table tbody tr td:last-child{margin-bottom:0}table tbody tr td:before{font-family:OpenSans-Regular;font-size:14px;color:#999;line-height:1.2;font-weight:unset;position:absolute;width:40%;left:30px;top:0}table tbody tr td:first-child:before{content:"Date"}table tbody tr td:nth-child(2):before{content:"Order ID"}table tbody tr td:nth-child(3):before{content:"Name"}table tbody tr td:nth-child(4):before{content:"Price"}table tbody tr td:nth-child(5):before{content:"Quantity"}table tbody tr td:nth-child(6):before{content:"Total"}.column4,.column5,.column6{text-align:left}.column1,.column2,.column3,.column4,.column5,.column6{width:100%}tbody tr{font-size:14px}}@media(max-width:576px){.container-table100{padding-left:15px;padding-right:15px}}
+                .text-green {color:#4caf50;font-weight: bold;}
+                .text-red {color: #e91e63;font-weight: bold;}
+                table td {border-bottom: 1px solid #CCC;}
+                table th {border: 1px solid #36304a;}
+            </style>
+            </head>
+            <body>
+              <div class="table100">
+                <table>
+                  <thead class="table100-head">
+                    <tr>
+                      <th class="column1"> Hostname </th>
+                      <th class="column2"> IP Address </th>
+                      <th class="column2"> Service Name </th>
+                      <th class="column3"> Service Status </th>
+                      <th class="column4"> Current Status </th>
+                      <th class="column5"> Action </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                  {{ results_list | join(' ') }}
+                  </tbody>
+                </table>
+              </div>
+              <div>  All copyrights reserved © ahmdsalah.me </div>
+            </body>
+      # - debug:
+      #     msg: "{{ services_report   }}"
+      - name: Sending The Report E-Mail
+        community.general.mail:
+          subtype: "html"
+          host: smtp.gmail.com
+          port: 587
+          username: "ansible.alerts@gmail.com"
+          password: "xxxxxxx" # Email Token
+          to: "{{ email }}"
+          subject: Ansible Report - {{ service_name }} Service Status
+          body: "{{ services_report }}"
+    when: report_enabled is defined and report_enabled
+  

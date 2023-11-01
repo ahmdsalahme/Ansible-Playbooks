@@ -1,0 +1,45 @@
+---
+- name: Linux | Add Multiple Users
+  hosts: all
+  vars:
+    # users: 
+    # [
+    #   {"user": "user1", "pass": "pass1"},
+    #   {"user": "user2", "pass": "pass2"},
+    #   {"user": "user3", "pass": "pass3"},
+    #   {"user": "user4", "pass": "pass4"}
+    # ]
+    # users: 
+    #   [
+    #     {"user": "user1", "pass": "$6$xy$kKqrZATwZlas2Io8kvMTfXSxzMV5RqDPOtitAMF2BPVkpynCAsH.ZdLf9zjWWNCr4THgFu3.AD8dhE9r062FA0"},
+    #     {"user": "user2", "pass": "$6$xy$kKqrZATwZlas2Io8kvMTfXSxzMV5RqDPOtitAMF2BPVkpynCAsH.ZdLf9zjWWNCr4THgFu3.AD8dhE9r062FA0"},
+    #     {"user": "user3", "pass": "$6$xy$kKqrZATwZlas2Io8kvMTfXSxzMV5RqDPOtitAMF2BPVkpynCAsH.ZdLf9zjWWNCr4THgFu3.AD8dhE9r062FA0"},
+    #     {"user": "user4", "pass": "$6$xy$kKqrZATwZlas2Io8kvMTfXSxzMV5RqDPOtitAMF2BPVkpynCAsH.ZdLf9zjWWNCr4THgFu3.AD8dhE9r062FA0"}
+    #   ]
+    # users: ["user1", "user2", "user3", "user4"]
+    # option: 'Add Multiple Users (PLAIN)'
+    # option: 'Add Multiple Users (ENCRYPTED)'
+    # option: 'Remove Multiple Users'
+  tasks:
+  - name: Parsing Users Input
+    set_fact:
+      users_x: "{{ users | from_json }}"
+  - name: Add Multiple Users (PLAIN)
+    user:
+      name: "{{ item.user }}"
+      password: "{{ item.pass | password_hash('sha512') }}"
+    with_items: "{{ users_x }}"
+    when: option == "Add Multiple Users (PLAIN)"
+  - name: Add Multiple Users (ENCRYPTED)
+    user:
+      name: "{{ item.user }}"
+      password: "{{ item.pass }}"
+    with_items: "{{ users_x }}"
+    when: option == "Add Multiple Users (ENCRYPTED)"
+  - name: Remove Multiple Users
+    user:
+      name: "{{ item }}"
+      state: "absent"
+      remove: true
+    with_items: "{{ users_x }}"
+    when: option == "Remove Multiple Users"

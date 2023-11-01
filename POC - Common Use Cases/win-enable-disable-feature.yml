@@ -1,0 +1,14 @@
+---
+- name: WINDOWS | Enable/Disable Windows Feature
+  hosts: all
+  tasks:
+    - name: Enable {{ feature_name }} Feature
+      ansible.windows.win_feature:
+        name: "{{ feature_name }}"
+        state: present
+      when: feature_state == "Enable"
+    - name: Disable {{ feature_name }} Feature
+      ansible.windows.win_feature:
+        name: "{{ feature_name }}"
+        state: absent
+      when: feature_state == "Disable"

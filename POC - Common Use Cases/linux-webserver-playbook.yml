@@ -1,0 +1,24 @@
+---
+- name: Install & Start WebServer using Apache
+  hosts: all
+  tasks:
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: latest
+    - name: Copy Custom Page to Default Home Page
+      copy:
+        src: ./src/web-server/
+        dest: /var/www/html
+    - name: Start httpd Service
+      service:
+        name: httpd
+        state: started
+        enabled: true
+    - name: Permit Traffic For HTTP Service
+      ansible.posix.firewalld:
+        zone: public
+        service: http
+        immediate: true
+        permanent: yes
+        state: enabled
